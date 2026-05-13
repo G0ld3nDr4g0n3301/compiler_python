@@ -60,9 +60,31 @@ class DeadCodeEliminator:
             stmt.body = new_stmts
             return stmt
 
+        elif isinstance(stmt, PrintStmt):
+            stmt.expr = self._optimize_expr(stmt.expr)
+            return stmt
         return stmt
 
     def _optimize_expr(self, expr: Expr) -> Expr:
-        # Для простоты возвращаем как есть.
-        # Сюда можно добавить Constant Folding (например 2+2 -> 4)
+        if isinstance(expr, BinaryExpr):
+            # оптимизируем подвыражения
+            if isinstance(expr.left, BinaryExpr) and expr.left.op in (TokenType.PLUS, TokenType.MINUS, TokenType.SLASH, TokenType.STAR):
+                expr.left = self._optimize_expr(expr.left)
+            if isinstance(expr.right, BinaryExpr) and expr.right.op in (TokenType.PLUS, TokenType.MINUS, TokenType.SLASH, TokenType.STAR):
+                expr.right = self._optimize_expr(expr.right)
+            if expr.op == TokenType.PLUS:
+                if isinstance(expr.left, StringExpr) and isinstance(expr.right, StringExpr): # если что правильность операции уже проверена семантическим анализатором
+                    return StringExpr(value=expr.left.value + expr.right.value)
+                elif isinstance(expr.left, NumberExpr) and isinstance(expr.right, NumberExpr):
+                    return NumberExpr(value=expr.right.value + expr.left.value)
+            elif expr.op == TokenType.MINUS:
+                if isinstance(expr.left, NumberExpr) and isinstance(expr.right, NumberExpr):
+                    return NumberExpr(value=expr.left.value - expr.right.value)
+            elif expr.op == TokenType.SLASH:
+                if isinstance(expr.left, NumberExpr) and isinstance(expr.right, NumberExpr):
+                    return NumberExpr(value=expr.left.value / expr.right.value)
+            elif expr.op == TokenType.STAR:
+                if isinstance(expr.left, NumberExpr) and isinstance(expr.right, NumberExpr):
+                    return NumberExpr(value=expr.left.value * expr.right.value)
+            
         return expr

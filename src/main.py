@@ -53,6 +53,10 @@ def main():
         }
         print "Fibonacci of 9 is:";
         print fibonacci(9);
+        """,
+        """
+        print 1 + 5 - 8;
+        print "hello " + "world";
         """
     ]
 
