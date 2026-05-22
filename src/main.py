@@ -3,12 +3,11 @@ from lexer import Lexer
 from parser import Parser, ParseError
 from analyzer import SemanticAnalyzer
 from optimizer import DeadCodeEliminator
-from translator import AstToLLMRTranslator
 from interpreter import Interpreter
 from ast_printer import AstPrinter
 
 def main():
-    examples =[
+    examples = [
         """
         var width : number = 5;
         var height : number = 10;
@@ -57,6 +56,27 @@ def main():
         """
         print 1 + 5 - 8;
         print "hello " + "world";
+        """,
+        """
+        var arr : number[] = [10, 20, 30];
+        print arr;
+        print "Element at index 1 is:";
+        print arr[1];
+        
+        arr[1] = 99;
+        print "Modified array:";
+        print arr;
+        """,
+        """
+        var names : string[] = [];
+        print names;
+        """,
+        """
+        var bad_arr : number[] = [1, "two", 3];
+        """,
+        """
+        var test_arr : number[] = [1, 2];
+        print test_arr[5];
         """
     ]
 
@@ -64,15 +84,12 @@ def main():
         print(f"========== EXAMPLE {i + 1} ==========")
         
         try:
-            # 1. Лексический анализ
             lexer = Lexer(code)
             tokens = lexer.tokenize()
 
-            # 2. Синтаксический анализ
             parser = Parser(tokens)
             ast = parser.parse()
 
-            # 3. Семантический анализ
             analyzer = SemanticAnalyzer()
             analyzer.analyze(ast)
             
@@ -83,17 +100,8 @@ def main():
                     has_errors = True
 
             if not has_errors:
-                # 4. Оптимизация
                 dce = DeadCodeEliminator()
                 ast = dce.optimize(ast)
-
-                # 5. Трансляция во внутреннее представление (LLMR)
-                translator = AstToLLMRTranslator()
-                llmr = translator.translate(ast)
-
-                print("--- LLMR GENERATED ---")
-                llmr.print_program()
-                print("------------------------")
                 
                 print("--- EXECUTION OUTPUT ---")
                 interpreter = Interpreter()

@@ -10,12 +10,10 @@ class Parser:
         self._position = 0
 
     def parse(self) -> list[Stmt]:
-        statements =[]
+        statements = []
         while not self._is_at_end():
             statements.append(self._parse_declaration())
         return statements
-
-    # --- Уровень деклараций и инструкций (Statements) ---
 
     def _parse_declaration(self) -> Stmt:
         if self._match(TokenType.VAR):
@@ -39,13 +37,25 @@ class Parser:
         return self._parse_expression_statement()
 
     def _parse_type(self) -> DataType:
+        base_type = None
         if self._match(TokenType.NUMBER_TYPE):
-            return DataType.NUMBER
-        if self._match(TokenType.BOOL_TYPE):
-            return DataType.BOOL
-        if self._match(TokenType.STRING_TYPE):
-            return DataType.STRING
-        raise ParseError("[Parse Error] Unknown Type, expected [string, number, bool]")
+            base_type = DataType.NUMBER
+        elif self._match(TokenType.BOOL_TYPE):
+            base_type = DataType.BOOL
+        elif self._match(TokenType.STRING_TYPE):
+            base_type = DataType.STRING
+        else:
+            raise ParseError("[Parse Error] Unknown Type, expected [string, number, bool]")
+        
+        if self._match(TokenType.LBRACKET):
+            self._consume(TokenType.RBRACKET, "Ожидается ']' после '[' в описании типа массива.")
+            if base_type == DataType.NUMBER:
+                return DataType.NUMBER_ARRAY
+            elif base_type == DataType.STRING:
+                return DataType.STRING_ARRAY
+            elif base_type == DataType.BOOL:
+                return DataType.BOOL_ARRAY
+        return base_type
 
     def _parse_var_declaration(self) -> Stmt:
         name_token = self._consume(TokenType.ID, "Ожидается имя переменной.")
@@ -64,7 +74,7 @@ class Parser:
         name_token = self._consume(TokenType.ID, "Ожидается имя функции.")
         self._consume(TokenType.LPAREN, "Ожидается '(' после имени функции.")
 
-        parameters =[]
+        parameters = []
         if not self._check(TokenType.RPAREN):
             while True:
                 param_name = self._consume(TokenType.ID, "Ожидается имя параметра.")
@@ -123,13 +133,11 @@ class Parser:
         return ExpressionStmt(expr=expr)
 
     def _parse_block(self) -> list[Stmt]:
-        statements =[]
+        statements = []
         while not self._check(TokenType.RBRACE) and not self._is_at_end():
             statements.append(self._parse_declaration())
         self._consume(TokenType.RBRACE, "Ожидается '}' после блока.")
         return statements
-
-    # --- Уровень выражений (Expressions) ---
 
     def _parse_expression(self) -> Expr:
         return self._parse_assignment()
@@ -143,6 +151,8 @@ class Parser:
 
             if isinstance(expr, VariableExpr):
                 return AssignExpr(name=expr.name, value=value)
+            elif isinstance(expr, IndexExpr):
+                return IndexAssignExpr(array=expr.array, index=expr.index, value=value)
 
             raise ParseError(f"[Parser Error] Line {equals.line}: Недопустимая цель для присваивания.")
 
@@ -208,7 +218,7 @@ class Parser:
         expr = self._parse_primary()
         while True:
             if self._match(TokenType.LPAREN):
-                args =[]
+                args = []
                 if not self._check(TokenType.RPAREN):
                     while True:
                         args.append(self._parse_expression())
@@ -216,6 +226,10 @@ class Parser:
                             break
                 self._consume(TokenType.RPAREN, "Ожидается ')' после аргументов.")
                 expr = CallExpr(callee=expr, arguments=args)
+            elif self._match(TokenType.LBRACKET):
+                index = self._parse_expression()
+                self._consume(TokenType.RBRACKET, "Ожидается ']' после индекса.")
+                expr = IndexExpr(array=expr, index=index)
             else:
                 break
         return expr
@@ -235,10 +249,19 @@ class Parser:
             self._consume(TokenType.RPAREN, "Ожидается ')' после выражения.")
             return expr
 
+        if self._match(TokenType.LBRACKET):
+            elements = []
+            if not self._check(TokenType.RBRACKET):
+                while True:
+                    elements.append(self._parse_expression())
+                    if not self._match(TokenType.COMMA):
+                        break
+            self._consume(TokenType.RBRACKET, "Ожидается ']' после элементов массива.")
+            return ArrayExpr(elements=elements)
+
         error_token = self._peek()
         raise ParseError(f"[Parser Error] Line {error_token.line}, Col {error_token.column}: Ожидается выражение.")
 
-    # --- Вспомогательные функции ---
 
     def _match(self, *types: TokenType) -> bool:
         for t in types:
