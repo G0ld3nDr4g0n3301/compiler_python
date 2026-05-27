@@ -48,7 +48,7 @@ class SemanticAnalyzer:
     def __init__(self):
         self._root_env = SemanticEnvironment()
         self._current_env = self._root_env
-        self.warnings: List[str] =[]
+        self.warnings: List[str] = []
         
         self._current_function_return_type: DataType = DataType.NUMBER
         self._in_function = False
@@ -65,10 +65,14 @@ class SemanticAnalyzer:
             if initialized:
                 init_type = self._visit_expression(stmt.initializer)
                 if init_type != stmt.type:
-                    self._add_error(f"Type mismatch: cannot initialize variable '{stmt.name}' with value of different type.")
+                    is_empty_array_assignment = (
+                        init_type == DataType.EMPTY_ARRAY and 
+                        stmt.type in (DataType.NUMBER_ARRAY, DataType.STRING_ARRAY, DataType.BOOL_ARRAY)
+                    )
+                    if not is_empty_array_assignment:
+                        self._add_error(f"Type mismatch: cannot initialize variable '{stmt.name}' with value of different type.")
             if not self._current_env.define_variable(stmt.name, stmt.type, initialized):
                 self._add_error(f"Variable '{stmt.name}' is already defined in this scope.")
-
 
         elif isinstance(stmt, FunctionStmt):
             p_types = [p[1] for p in stmt.params]
@@ -117,7 +121,12 @@ class SemanticAnalyzer:
                 actual_type = self._visit_expression(stmt.value)
             
             if actual_type != self._current_function_return_type:
-                self._add_error("Return type mismatch. Expected correct type.")
+                is_empty_array_assignment = (
+                    actual_type == DataType.EMPTY_ARRAY and 
+                    self._current_function_return_type in (DataType.NUMBER_ARRAY, DataType.STRING_ARRAY, DataType.BOOL_ARRAY)
+                )
+                if not is_empty_array_assignment:
+                    self._add_error("Return type mismatch. Expected correct type.")
             self._has_return = True
 
         elif isinstance(stmt, PrintStmt):
@@ -150,6 +159,64 @@ class SemanticAnalyzer:
         if isinstance(expr, NumberExpr): return DataType.NUMBER
         elif isinstance(expr, StringExpr): return DataType.STRING
         
+        elif isinstance(expr, ArrayExpr):
+            if not expr.elements:
+                return DataType.EMPTY_ARRAY
+            
+            first_type = self._visit_expression(expr.elements[0])
+            for idx, element in enumerate(expr.elements[1:], start=1):
+                t = self._visit_expression(element)
+                if t != first_type:
+                    self._add_error(f"Array elements must be of the same type. Element at index {idx} has different type.")
+            
+            if first_type == DataType.NUMBER:
+                return DataType.NUMBER_ARRAY
+            elif first_type == DataType.STRING:
+                return DataType.STRING_ARRAY
+            elif first_type == DataType.BOOL:
+                return DataType.BOOL_ARRAY
+            return DataType.NUMBER_ARRAY
+
+        elif isinstance(expr, IndexExpr):
+            arr_type = self._visit_expression(expr.array)
+            idx_type = self._visit_expression(expr.index)
+            
+            if idx_type != DataType.NUMBER:
+                self._add_error("Array index must be a number.")
+            
+            if arr_type == DataType.NUMBER_ARRAY:
+                return DataType.NUMBER
+            elif arr_type == DataType.STRING_ARRAY:
+                return DataType.STRING
+            elif arr_type == DataType.BOOL_ARRAY:
+                return DataType.BOOL
+            else:
+                self._add_error("Cannot index into non-array type.")
+                return DataType.NUMBER
+
+        elif isinstance(expr, IndexAssignExpr):
+            arr_type = self._visit_expression(expr.array)
+            idx_type = self._visit_expression(expr.index)
+            val_type = self._visit_expression(expr.value)
+            
+            if idx_type != DataType.NUMBER:
+                self._add_error("Array index must be a number.")
+                
+            expected_val_type = None
+            if arr_type == DataType.NUMBER_ARRAY:
+                expected_val_type = DataType.NUMBER
+            elif arr_type == DataType.STRING_ARRAY:
+                expected_val_type = DataType.STRING
+            elif arr_type == DataType.BOOL_ARRAY:
+                expected_val_type = DataType.BOOL
+            else:
+                self._add_error("Cannot assign index of non-array type.")
+                
+            if expected_val_type and val_type != expected_val_type:
+                self._add_error(f"Type mismatch: cannot assign value of type {val_type.name} to array element of type {expected_val_type.name}.")
+                
+            return val_type
+
         elif isinstance(expr, CallExpr):
             self._visit_expression(expr.callee)
             if isinstance(expr.callee, VariableExpr):
@@ -183,8 +250,13 @@ class SemanticAnalyzer:
                 self._add_error(f"Variable '{expr.name}' is not defined.")
                 return val_type
             info = self._current_env.lookup(expr.name)
-            if info and info.type != val_type:
-                self._add_error(f"Type mismatch: cannot assign to variable '{expr.name}'.")
+            if info:
+                is_empty_array_assignment = (
+                    val_type == DataType.EMPTY_ARRAY and 
+                    info.type in (DataType.NUMBER_ARRAY, DataType.STRING_ARRAY, DataType.BOOL_ARRAY)
+                )
+                if info.type != val_type and not is_empty_array_assignment:
+                    self._add_error(f"Type mismatch: cannot assign to variable '{expr.name}'.")
             return val_type
 
         elif isinstance(expr, UnaryExpr):

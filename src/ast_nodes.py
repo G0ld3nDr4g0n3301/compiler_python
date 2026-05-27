@@ -7,6 +7,10 @@ class DataType(Enum):
     NUMBER = auto()
     STRING = auto()
     BOOL = auto()
+    NUMBER_ARRAY = auto()
+    STRING_ARRAY = auto()
+    BOOL_ARRAY = auto()
+    EMPTY_ARRAY = auto()
 
 class Expr: pass
 class Stmt: pass
@@ -43,6 +47,21 @@ class AssignExpr(Expr):
 class CallExpr(Expr):
     callee: Expr
     arguments: List[Expr]
+
+@dataclass
+class ArrayExpr(Expr):
+    elements: List[Expr]
+
+@dataclass
+class IndexExpr(Expr):
+    array: Expr
+    index: Expr
+
+@dataclass
+class IndexAssignExpr(Expr):
+    array: Expr
+    index: Expr
+    value: Expr
 
 # --- Инструкции (Statements) ---
 

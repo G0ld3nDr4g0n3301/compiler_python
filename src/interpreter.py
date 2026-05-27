@@ -55,6 +55,8 @@ class Interpreter:
                 value = ""
             elif stmt.type == DataType.BOOL:
                 value = False
+            elif stmt.type in (DataType.NUMBER_ARRAY, DataType.STRING_ARRAY, DataType.BOOL_ARRAY):
+                value = []
             self.environment.define(stmt.name, value)
 
         elif isinstance(stmt, FunctionStmt):
@@ -102,11 +104,51 @@ class Interpreter:
         elif isinstance(expr, VariableExpr):
             return self.environment.get(expr.name)
         
+        elif isinstance(expr, ArrayExpr):
+            return [self._evaluate(el) for el in expr.elements]
+
+        elif isinstance(expr, IndexExpr):
+            arr = self._evaluate(expr.array)
+            idx = self._evaluate(expr.index)
+            
+            if not isinstance(arr, list):
+                raise RuntimeError("Target is not an array.")
+            if not isinstance(idx, (int, float)):
+                raise RuntimeError("Array index must be a number.")
+            
+            int_idx = int(idx)
+            if int_idx != idx:
+                raise RuntimeError(f"Array index must be an integer, got {idx}.")
+            
+            if int_idx < 0 or int_idx >= len(arr):
+                raise RuntimeError(f"Index {int_idx} out of bounds for array of length {len(arr)}.")
+            
+            return arr[int_idx]
+
+        elif isinstance(expr, IndexAssignExpr):
+            arr = self._evaluate(expr.array)
+            idx = self._evaluate(expr.index)
+            val = self._evaluate(expr.value)
+            
+            if not isinstance(arr, list):
+                raise RuntimeError("Target is not an array.")
+            if not isinstance(idx, (int, float)):
+                raise RuntimeError("Array index must be a number.")
+            
+            int_idx = int(idx)
+            if int_idx != idx:
+                raise RuntimeError(f"Array index must be an integer, got {idx}.")
+            
+            if int_idx < 0 or int_idx >= len(arr):
+                raise RuntimeError(f"Index {int_idx} out of bounds for array of length {len(arr)}.")
+            
+            arr[int_idx] = val
+            return val
+
         elif isinstance(expr, AssignExpr):
             val = self._evaluate(expr.value)
             self.environment.assign(expr.name, val)
             return val
-
 
         elif isinstance(expr, CallExpr):
             callee = self._evaluate(expr.callee)
@@ -170,6 +212,7 @@ class Interpreter:
         if isinstance(val, bool): return val
         if isinstance(val, (int, float)): return val != 0.0
         if isinstance(val, str): return bool(val)
+        if isinstance(val, list): return len(val) > 0
         return False
 
     def _stringify(self, val: Any) -> str:
@@ -180,4 +223,7 @@ class Interpreter:
         if isinstance(val, (int, float)):
             if val == int(val): return str(int(val))
             return str(val)
+        if isinstance(val, list):
+            elements_str = ", ".join(self._stringify(item) for item in val)
+            return f"[{elements_str}]"
         return str(val)

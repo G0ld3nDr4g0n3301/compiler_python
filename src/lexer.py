@@ -32,6 +32,8 @@ OPERATORS = {
     ")": TokenType.RPAREN,
     "{": TokenType.LBRACE,
     "}": TokenType.RBRACE,
+    "[": TokenType.LBRACKET,
+    "]": TokenType.RBRACKET,
     ";": TokenType.SEMICOLON,
     ":": TokenType.COLON,
     ",": TokenType.COMMA
@@ -45,7 +47,7 @@ class Lexer:
         self._column = 1
 
     def tokenize(self) -> list[Token]:
-        tokens =[]
+        tokens = []
         
         while self._position < len(self._input):
             current = self._peek()

@@ -10,7 +10,7 @@ class AstPrinter:
         tab = "  " * indent
 
         if isinstance(stmt, VarStmt):
-            print(f"{tab}VarDecl: {stmt.name}")
+            print(f"{tab}VarDecl: {stmt.name} ({self._type_to_str(stmt.type)})")
             if stmt.initializer:
                 self._print_expr(stmt.initializer, indent + 1)
         
@@ -80,6 +80,30 @@ class AstPrinter:
         elif isinstance(expr, AssignExpr):
             print(f"{tab}Assign: {expr.name}")
             self._print_expr(expr.value, indent + 1)
+
+        elif isinstance(expr, ArrayExpr):
+            print(f"{tab}ArrayLiteral:")
+            if expr.elements:
+                for element in expr.elements:
+                    self._print_expr(element, indent + 1)
+            else:
+                print(f"{tab}  (empty)")
+
+        elif isinstance(expr, IndexExpr):
+            print(f"{tab}IndexAccess:")
+            print(f"{tab}  Array:")
+            self._print_expr(expr.array, indent + 2)
+            print(f"{tab}  Index:")
+            self._print_expr(expr.index, indent + 2)
+
+        elif isinstance(expr, IndexAssignExpr):
+            print(f"{tab}IndexAssign:")
+            print(f"{tab}  Array:")
+            self._print_expr(expr.array, indent + 2)
+            print(f"{tab}  Index:")
+            self._print_expr(expr.index, indent + 2)
+            print(f"{tab}  Value:")
+            self._print_expr(expr.value, indent + 2)
             
         elif isinstance(expr, CallExpr):
             print(f"{tab}Call:")
@@ -96,6 +120,10 @@ class AstPrinter:
         if typ == DataType.NUMBER: return "number"
         if typ == DataType.STRING: return "string"
         if typ == DataType.BOOL: return "bool"
+        if typ == DataType.NUMBER_ARRAY: return "number[]"
+        if typ == DataType.STRING_ARRAY: return "string[]"
+        if typ == DataType.BOOL_ARRAY: return "bool[]"
+        if typ == DataType.EMPTY_ARRAY: return "[]"
         return "unknown"
 
 
